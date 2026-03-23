@@ -7,7 +7,7 @@ app = Flask(__name__)
 # Create table at startup
 # -------------------------
 def create_table():
-    conn = sqlite3.connect("database.db")
+    conn = sqlite3.connect("/tmp/database.db")
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS complaints (
@@ -31,7 +31,7 @@ create_table()
 # Database connection
 # -------------------------
 def get_db_connection():
-    conn = sqlite3.connect("database.db")
+    conn = sqlite3.connect("/tmp/database.db")
     conn.row_factory = sqlite3.Row
     return conn
 
