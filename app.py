@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect
 import sqlite3
+from flask import jsonify
 
 app = Flask(__name__)
 
@@ -135,3 +136,58 @@ def update_status(id):
 # -------------------------
 if __name__ == '__main__':
     app.run(debug=True)
+
+@app.route('/api/submit', methods=['POST'])
+def api_submit():
+    data = request.get_json()
+
+    title = data.get('title')
+    name = data.get('name')
+    email = data.get('email')
+    category = data.get('category')
+    description = data.get('description')
+
+    department = assign_department(description)
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO complaints 
+        (title, name, email, category, description, status, department)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (title, name, email, category, description, "Pending", department))
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "message": "Complaint submitted successfully",
+        "department": department
+    })
+
+@app.route('/api/complaints', methods=['GET'])
+def get_complaints():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM complaints")
+    complaints = cursor.fetchall()
+
+    conn.close()
+
+    # Convert to list of dicts
+    result = []
+    for row in complaints:
+        result.append({
+            "id": row["id"],
+            "title": row["title"],
+            "name": row["name"],
+            "email": row["email"],
+            "category": row["category"],
+            "description": row["description"],
+            "status": row["status"],
+            "department": row["department"]
+        })
+
+    return jsonify(result)
