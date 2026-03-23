@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard</title>
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-light">
+
+<!-- Navbar -->
+<nav class="navbar navbar-dark bg-dark">
+  <div class="container-fluid">
+    <span class="navbar-brand">🏛 Grievance Portal - Admin</span>
+    <a href="/" class="btn btn-light">User Portal</a>
+  </div>
+</nav>
+
+<div class="container mt-5">
+
+    <h2 class="text-center mb-4">📊 Admin Dashboard</h2>
+
+    <div class="row text-center mb-4">
+
+      <div class="col-md-4">
+        <div class="card shadow p-3">
+            <h5>Total Complaints</h5>
+            <h3>{{ complaints|length }}</h3>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card shadow p-3">
+            <h5>Pending</h5>
+            <h3>
+                {{ complaints | selectattr('status', 'equalto', 'Pending') | list | length }}
+            </h3>
+        </div>
+       </div>
+
+      <div class="col-md-4">
+        <div class="card shadow p-3">
+            <h5>Resolved</h5>
+            <h3>
+                {{ complaints | selectattr('status', 'equalto', 'Resolved') | list | length }}
+            </h3>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped shadow">
+            
+            <thead class="table-dark text-center">
+                <tr>
+                    <th>ID</th>
+                    <th>Title</th>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>Status</th>
+                    <th>Department</th>
+                    <th>Update</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for complaint in complaints %}
+                <tr class="text-center">
+
+                    <td>{{ complaint['id'] }}</td>
+                    <td>{{ complaint['title'] }}</td>
+                    <td>{{ complaint['name'] }}</td>
+                    <td>{{ complaint['category'] }}</td>
+
+                    <!-- Status with colors -->
+                    <td>
+                        {% if complaint['status'] == 'Pending' %}
+                            <span class="badge bg-warning text-dark">Pending</span>
+                        {% elif complaint['status'] == 'In Progress' %}
+                            <span class="badge bg-primary">In Progress</span>
+                        {% else %}
+                            <span class="badge bg-success">Resolved</span>
+                        {% endif %}
+                    </td>
+
+                    <td>{{ complaint['department'] }}</td>
+
+                    <!-- Update Form -->
+                    <td>
+                        <form action="/update_status/{{ complaint['id'] }}" method="POST" class="d-flex gap-2 justify-content-center">
+                            
+                            <select name="status" class="form-select form-select-sm">
+                                <option value="Pending" {% if complaint['status'] == 'Pending' %}selected{% endif %}>Pending</option>
+                                <option value="In Progress" {% if complaint['status'] == 'In Progress' %}selected{% endif %}>In Progress</option>
+                                <option value="Resolved" {% if complaint['status'] == 'Resolved' %}selected{% endif %}>Resolved</option>
+                            </select>
+
+                            <button type="submit" class="btn btn-success btn-sm">Update</button>
+                        </form>
+                    </td>
+
+                </tr>
+                {% endfor %}
+            </tbody>
+
+        </table>
+    </div>
+
+</div>
+
+</body>
+</html>
