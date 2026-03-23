@@ -106,7 +106,7 @@ def admin_dashboard():
 
     conn.close()
 
-    return render_template("admin.html", complaints=complaints)
+    return render_templates("admin.html", complaints=complaints)
 
 
 # -------------------------
