@@ -59,7 +59,7 @@ def assign_department(description):
 # -------------------------
 @app.route('/')
 def home():
-    return render_template("index.html")
+    return render_templates("index.html")
 
 
 # -------------------------
