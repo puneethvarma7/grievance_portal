@@ -59,7 +59,7 @@ def assign_department(description):
 # -------------------------
 @app.route('/')
 def home():
-    return render_templates("index.html")
+    return render_template("index.html")
 
 
 # -------------------------
@@ -106,7 +106,7 @@ def admin_dashboard():
 
     conn.close()
 
-    return render_templates("admin.html", complaints=complaints)
+    return render_template("admin.html", complaints=complaints)
 
 
 # -------------------------
