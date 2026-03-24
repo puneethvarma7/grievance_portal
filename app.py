@@ -1,6 +1,6 @@
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request, redirect, jsonify
 import sqlite3
-from flask import jsonify
+from textblob import TextBlob
 
 app = Flask(__name__)
 
@@ -19,7 +19,10 @@ def create_table():
             category TEXT,
             description TEXT,
             status TEXT DEFAULT 'Pending',
-            department TEXT
+            department TEXT,
+            priority TEXT,
+            resolution_time TEXT,
+            sentiment TEXT
         )
     """)
     conn.commit()
@@ -56,6 +59,44 @@ def assign_department(description):
 
 
 # -------------------------
+# ML FUNCTIONS
+# -------------------------
+def calculate_priority(description):
+    text = description.lower()
+    blob = TextBlob(description)
+
+    polarity = blob.sentiment.polarity
+
+    if polarity < -0.2:
+        return "High"
+    elif "water" in text or "electricity" in text or "leak" in text:
+        return "Medium"
+    else:
+        return "Low"
+
+
+def predict_resolution_time(priority):
+    if priority == "High":
+        return "1-2 days"
+    elif priority == "Medium":
+        return "2-4 days"
+    else:
+        return "5-7 days"
+
+
+def get_sentiment(description):
+    blob = TextBlob(description)
+    polarity = blob.sentiment.polarity
+
+    if polarity < 0:
+        return "Negative"
+    elif polarity == 0:
+        return "Neutral"
+    else:
+        return "Positive"
+
+
+# -------------------------
 # Home Page
 # -------------------------
 @app.route('/')
@@ -64,7 +105,7 @@ def home():
 
 
 # -------------------------
-# Submit Complaint
+# Submit Complaint (WEB)
 # -------------------------
 @app.route('/submit', methods=['POST'])
 def submit_complaint():
@@ -75,19 +116,22 @@ def submit_complaint():
     description = request.form['description']
 
     department = assign_department(description)
+    priority = calculate_priority(description)
+    resolution_time = predict_resolution_time(priority)
+    sentiment = get_sentiment(description)
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    query = """
-    INSERT INTO complaints 
-    (title, name, email, category, description, status, department)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-    """
+    cursor.execute("""
+        INSERT INTO complaints 
+        (title, name, email, category, description, status, department, priority, resolution_time, sentiment)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        title, name, email, category, description,
+        "Pending", department, priority, resolution_time, sentiment
+    ))
 
-    values = (title, name, email, category, description, "Pending", department)
-
-    cursor.execute(query, values)
     conn.commit()
     conn.close()
 
@@ -132,11 +176,8 @@ def update_status(id):
 
 
 # -------------------------
-# Run App
+# API: Submit Complaint
 # -------------------------
-if __name__ == '__main__':
-    app.run(debug=True)
-
 @app.route('/api/submit', methods=['POST'])
 def api_submit():
     data = request.get_json()
@@ -148,24 +189,37 @@ def api_submit():
     description = data.get('description')
 
     department = assign_department(description)
+    priority = calculate_priority(description)
+    resolution_time = predict_resolution_time(priority)
+    sentiment = get_sentiment(description)
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
         INSERT INTO complaints 
-        (title, name, email, category, description, status, department)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (title, name, email, category, description, "Pending", department))
+        (title, name, email, category, description, status, department, priority, resolution_time, sentiment)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        title, name, email, category, description,
+        "Pending", department, priority, resolution_time, sentiment
+    ))
 
     conn.commit()
     conn.close()
 
     return jsonify({
         "message": "Complaint submitted successfully",
-        "department": department
+        "department": department,
+        "priority": priority,
+        "resolution_time": resolution_time,
+        "sentiment": sentiment
     })
 
+
+# -------------------------
+# API: Get Complaints
+# -------------------------
 @app.route('/api/complaints', methods=['GET'])
 def get_complaints():
     conn = get_db_connection()
@@ -176,7 +230,6 @@ def get_complaints():
 
     conn.close()
 
-    # Convert to list of dicts
     result = []
     for row in complaints:
         result.append({
@@ -187,7 +240,17 @@ def get_complaints():
             "category": row["category"],
             "description": row["description"],
             "status": row["status"],
-            "department": row["department"]
+            "department": row["department"],
+            "priority": row["priority"],
+            "resolution_time": row["resolution_time"],
+            "sentiment": row["sentiment"]
         })
 
     return jsonify(result)
+
+
+# -------------------------
+# Run App
+# -------------------------
+if __name__ == '__main__':
+    app.run(debug=True)
