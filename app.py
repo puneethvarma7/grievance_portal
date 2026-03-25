@@ -5,8 +5,10 @@ import os
 import nltk
 nltk.download('punkt')
 import datetime
-from googletrans import Translator
-translator = Translator()
+from deep_translator import GoogleTranslator 
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.naive_bayes import MultinomialNB
+
 
 app = Flask(__name__)
 
@@ -44,6 +46,57 @@ def create_table():
 
 create_table()
 
+
+# -------------------------
+# ML TRAINING DATA
+# -------------------------
+
+training_texts = [
+    "water leakage urgent",
+    "electricity problem no power",
+    "road pothole dangerous",
+    "garbage not cleaned",
+    "fake complaint test",
+    "asdf random text",
+    "normal issue minor",
+    "street light not working",
+    "test message",
+    "hello",
+    "random text",
+    "abc complaint"
+]
+
+priority_labels = [
+    "High",
+    "High",
+    "High",
+    "Medium",
+    "Low",
+    "Low",
+    "Low",
+    "Medium",
+    "Low",
+    "Low",
+    "Low",
+    "Low"
+]
+
+fraud_labels = [
+    0, 0, 0, 0,
+    1, 1,
+    0, 0,
+    1, 1, 1, 1
+]
+
+vectorizer = CountVectorizer()
+X = vectorizer.fit_transform(training_texts)
+
+priority_model = MultinomialNB()
+priority_model.fit(X, priority_labels)
+
+fraud_model = MultinomialNB()
+fraud_model.fit(X, fraud_labels)
+
 # -------------------------
 # DB connection
 # -------------------------
@@ -76,30 +129,9 @@ def assign_department(description):
 # -------------------------
 # ML FUNCTIONS
 # -------------------------
-def calculate_priority(description):
-    text = description.lower()
-    blob = TextBlob(description)
-    polarity = blob.sentiment.polarity
-
-    score = 0
-
-    if polarity < -0.5:
-        score += 3
-    elif polarity < -0.2:
-        score += 2
-
-    if any(word in text for word in ["urgent", "danger", "accident", "fire"]):
-        score += 3
-
-    if any(word in text for word in ["water", "electricity", "leak"]):
-        score += 2
-
-    if score >= 5:
-        return "High"
-    elif score >= 3:
-        return "Medium"
-    else:
-        return "Low"
+def calculate_priority_ml(description):
+    vec = vectorizer.transform([description])
+    return priority_model.predict(vec)[0]
 
 def predict_resolution_time(priority):
     return {
@@ -126,23 +158,15 @@ def is_duplicate(description):
     conn.close()
 
     for row in rows:
-        if description.lower() in row["description"].lower():
+        if description.lower() == row["description"].lower():
             return True
 
     return False
 
-def is_fraud(description):
-    text = description.lower()
-
-    if len(text) < 10:
-        return True
-
-    spam_words = ["test", "fake", "asdf"]
-
-    if any(word in text for word in spam_words):
-        return True
-
-    return False
+def is_fraud_ml(description):
+    vec = vectorizer.transform([description])
+    prediction = fraud_model.predict(vec)[0]
+    return prediction == 1
 
 
 
@@ -196,7 +220,7 @@ def submit_complaint():
 
         description = translate_to_english(description)
         department = assign_department(description)
-        priority = calculate_priority(description)
+        priority = calculate_priority_ml(description)
         resolution_time = predict_resolution_time(priority)
         sentiment = get_sentiment(description)
         date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -204,7 +228,7 @@ def submit_complaint():
         if is_duplicate(description):
             return "Duplicate complaint detected!"
         
-        if is_fraud(description):
+        if is_fraud_ml(description):
             return "Fraud or invalid complaint!"
 
         conn = get_db_connection()
@@ -256,7 +280,7 @@ def api_submit():
         description = data.get('description', '')
 
         department = assign_department(description)
-        priority = calculate_priority(description)
+        priority = calculate_priority_ml(description)
         resolution_time = predict_resolution_time(priority)
         sentiment = get_sentiment(description)
 
@@ -303,11 +327,13 @@ def get_complaints():
 
 
 
+
+
 def translate_to_english(text):
     try:
-        translator = Translator()
-        return translator.translate(text, dest='en').text
-    except:
+        return GoogleTranslator(source='auto', target='en').translate(text)
+    except Exception as e:
+        print("Translation error:", e)
         return text
 
 @app.route('/feedback/<int:id>', methods=['GET', 'POST'])

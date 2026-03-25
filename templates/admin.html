@@ -215,7 +215,7 @@
 
               <td>
                  {% if complaint['image'] %}
-                   <img src="{{ url_for('static', filename='uploads/' + complaint['image']) }}" width="80">
+                   <img src="/tmp/uploads/{{ complaint['image'] }}" width="80">
                  {% else %}
                    No Image
                  {% endif %}
