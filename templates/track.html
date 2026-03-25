@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Track Status – Jan Sampark</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    .page-wrapper { max-width: 720px; margin: 48px auto; padding: 0 20px 60px; animation: fadeUp .6s ease both; }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+
+    .page-header { margin-bottom: 28px; }
+    .page-header h1 { font-family:'Playfair Display',serif; font-size:28px; color:var(--navy); }
+    .page-header p  { color:var(--muted); font-size:14px; margin-top:4px; }
+
+    .search-row { display:flex; gap:10px; margin-bottom:28px; }
+    .search-row .form-control { flex:1; }
+    .search-row .btn-gold { flex-shrink:0; }
+
+    /* Result card */
+    .result-card { display:none; }
+    .result-card.show { display:block; }
+
+    .grievance-id {
+      font-family:'Bree Serif',serif;
+      font-size:13px; color:var(--muted); margin-bottom:8px;
+    }
+    .grievance-title {
+      font-family:'Playfair Display',serif;
+      font-size:20px; color:var(--navy); margin-bottom:16px;
+    }
+
+    .meta-grid {
+      display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px;
+    }
+    .meta-item label { font-size:11px; text-transform:uppercase; letter-spacing:.8px; color:var(--muted); font-weight:600; }
+    .meta-item p     { font-size:14px; color:var(--text); margin-top:3px; }
+
+    /* Progress steps */
+    .progress-track { margin-top:24px; }
+    .progress-track h3 { font-family:'Bree Serif',serif; font-size:15px; color:var(--navy); margin-bottom:16px; }
+    .steps { position:relative; padding-left:28px; }
+    .steps::before {
+      content:''; position:absolute; left:9px; top:0; bottom:0; width:2px; background:var(--border);
+    }
+    .step { position:relative; margin-bottom:20px; }
+    .step-dot {
+      position:absolute; left:-28px; top:2px;
+      width:18px; height:18px; border-radius:50%;
+      background:var(--border); border:2px solid var(--white);
+      display:flex; align-items:center; justify-content:center;
+      font-size:9px;
+    }
+    .step.done .step-dot  { background:var(--success); }
+    .step.active .step-dot{ background:var(--gold); }
+    .step-label { font-weight:600; font-size:14px; color:var(--text); }
+    .step.done .step-label { color:var(--success); }
+    .step.active .step-label { color:var(--gold); }
+    .step-date  { font-size:12px; color:var(--muted); margin-top:2px; }
+
+    .not-found { display:none; }
+    .not-found.show {
+      background:#fef2f2; color:#991b1b; border:1px solid #fca5a5;
+      border-radius:var(--radius-sm); padding:14px 18px; font-weight:500;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="site-nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="index.html">
+        <div class="nav-emblem">🏛</div>
+        <div class="nav-brand-text"><h2>Jan Sampark</h2><span>Citizen Grievance Portal</span></div>
+      </a>
+      <button class="nav-toggle" id="navToggle"><span></span><span></span><span></span></button>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="/">🏠 Home</a></li>
+        <li><a href="/submit_page">📄 Submit Grievance</a></li>
+        <li><a href="/track" class="active">🔍 Track Status</a></li>
+        <li><a href="/admin">📊 Admin Dashboard</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="page-wrapper">
+    <div class="page-header">
+      <h1>Track Your Grievance</h1>
+      <p>Enter your Grievance ID to check the current status and progress.</p>
+    </div>
+
+    <div class="card">
+      <div class="search-row">
+        <input class="form-control" id="searchInput" placeholder="Enter Grievance ID  e.g. GRV-001" />
+        <button class="btn-gold" onclick="trackGrievance()">🔍 Track</button>
+      </div>
+
+      <div id="notFound" class="not-found">❌ No grievance found with that ID. Please check and try again.</div>
+
+      <!-- Result -->
+      <div id="resultCard" class="result-card">
+        <p class="grievance-id" id="resId"></p>
+        <p class="grievance-title" id="resTitle"></p>
+
+        <div class="meta-grid">
+          <div class="meta-item"><label>Submitted By</label><p id="resName"></p></div>
+          <div class="meta-item"><label>Category</label><p id="resCategory"></p></div>
+          <div class="meta-item"><label>Department</label><p id="resDept"></p></div>
+          <div class="meta-item"><label>Date Filed</label><p id="resDate"></p></div>
+          <div class="meta-item"><label>Status</label><p id="resBadge"></p></div>
+        </div>
+
+        <div class="progress-track">
+          <h3>Resolution Timeline</h3>
+          <div class="steps" id="resSteps"></div>
+        </div>
+
+        <div id="feedbackSection" style="margin-top:20px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>© 2026 <strong>Jan Sampark</strong> – Government Citizen Grievance Portal. All rights reserved.</p>
+  </footer>
+
+  <script>
+    document.getElementById('navToggle').addEventListener('click', () =>
+      document.getElementById('navLinks').classList.toggle('open'));
+
+    /* Demo data — in production this would be a fetch() call to your Flask API */
+    const demoData = {
+      'GRV-001': { title:'Irregular water supply in Ward 12', name:'Rajesh Kumar', category:'Water Supply', dept:'Public Health Engineering', date:'2026-03-20', status:'In Progress' },
+      'GRV-002': { title:'Pothole on Main Road', name:'Sunita Devi', category:'Road & Infrastructure', dept:'Public Works Department', date:'2026-03-22', status:'Pending' },
+      'GRV-003': { title:'Street light not working', name:'Mohan Lal', category:'Electricity', dept:'Energy Department', date:'2026-03-18', status:'Resolved' },
+      'GRV-004': { title:'Garbage not collected', name:'Priya Sharma', category:'Sanitation & Waste', dept:'Urban Development', date:'2026-03-23', status:'Pending' },
+    };
+
+    const statusSteps = {
+      'Pending':     ['Submitted','Under Review','In Progress','Resolved'],
+      'In Progress': ['Submitted','Under Review','In Progress','Resolved'],
+      'Resolved':    ['Submitted','Under Review','In Progress','Resolved'],
+    };
+    const doneCount = { 'Pending':1, 'In Progress':3, 'Resolved':4 };
+
+    function trackGrievance() {
+      const id  = document.getElementById('searchInput').value.trim().toUpperCase();
+      const nf  = document.getElementById('notFound');
+      const rc  = document.getElementById('resultCard');
+      nf.classList.remove('show'); rc.classList.remove('show');
+
+      const g = demoData[id];
+
+      if (!g) { nf.classList.add('show'); return; }
+      let feedbackHTML = "";
+
+    if (g.status === "Resolved") {
+        feedbackHTML = `
+          <div style="margin-top:20px; padding:15px; border:1px solid #ddd; border-radius:8px;">
+            <h3>Feedback</h3>
+              <a href="/feedback/1">
+                <button style="padding:8px 14px; background:#2563eb; color:white; border:none; border-radius:5px;">
+                 Give Feedback
+                </button>
+              </a>
+          </div>
+  `;
+}
+
+      
+      if (!g) { nf.classList.add('show'); return; }
+
+      document.getElementById('resId').textContent       = id;
+      document.getElementById('resTitle').textContent    = g.title;
+      document.getElementById('resName').textContent     = g.name;
+      document.getElementById('resCategory').textContent = g.category;
+      document.getElementById('resDept').textContent     = g.dept;
+      document.getElementById('resDate').textContent     = g.date;
+      
+
+      const badgeClass = g.status === 'Pending' ? 'badge-pending' : g.status === 'In Progress' ? 'badge-progress' : 'badge-resolved';
+      document.getElementById('resBadge').innerHTML = `<span class="badge ${badgeClass}">${g.status}</span>`;
+
+      const done = doneCount[g.status];
+      const steps = statusSteps[g.status];
+      document.getElementById('resSteps').innerHTML = steps.map((s, i) => {
+        const cls = i < done ? 'done' : i === done - 1 && g.status !== 'Resolved' ? 'active' : '';
+        return `<div class="step ${cls}"><div class="step-dot">${i < done ? '✓' : ''}</div><div class="step-label">${s}</div><div class="step-date">${i < done ? g.date : '—'}</div></div>`;
+      }).join('');
+
+      rc.classList.add('show');
+      document.getElementById("feedbackSection").innerHTML = feedbackHTML;
+    }
+
+    document.getElementById('searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') trackGrievance(); });
+  </script>
+</body>
+</html>
