@@ -305,8 +305,8 @@ def get_complaints():
 
 def translate_to_english(text):
     try:
-        translated = translator.translate(text, dest='en')
-        return translated.text
+        translator = Translator()
+        return translator.translate(text, dest='en').text
     except:
         return text
 
