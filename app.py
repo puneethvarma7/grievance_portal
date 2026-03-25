@@ -2,6 +2,8 @@ from flask import Flask, render_template, request, redirect, jsonify
 import sqlite3
 from textblob import TextBlob
 import os
+import nltk
+nltk.download('punkt')
 import datetime
 from googletrans import Translator
 translator = Translator()
@@ -330,7 +332,7 @@ def user_feedback(id):
 
 #image folder
 
-UPLOAD_FOLDER = "static/uploads"
+UPLOAD_FOLDER = "/tmp/uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
